@@ -1,21 +1,26 @@
 package com.angelodibello.mediaarchive.controller;
 
+import com.angelodibello.mediaarchive.dto.MediaAssetResponse;
+import com.angelodibello.mediaarchive.dto.UpdateMediaAssetRequest;
 import com.angelodibello.mediaarchive.model.MediaAsset;
 import com.angelodibello.mediaarchive.service.MediaAssetService;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
-import com.angelodibello.mediaarchive.dto.MediaAssetResponse;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.Path;
 import java.time.LocalDate;
-
 import java.util.List;
-import com.angelodibello.mediaarchive.dto.UpdateMediaAssetRequest;
 
 @RestController
 @RequestMapping("/api/media-assets")
@@ -163,6 +168,30 @@ public class MediaAssetController {
                 sortBy,
                 direction
         );
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<Resource> download(
+            @PathVariable Long id
+    ) throws MalformedURLException {
+
+        Path filePath = service.getStoredFile(id);
+
+        Resource resource = new UrlResource(
+                filePath.toUri()
+        );
+
+        String filename = filePath
+                .getFileName()
+                .toString();
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\""
+                )
+                .body(resource);
     }
 
     @PatchMapping("/{id}")

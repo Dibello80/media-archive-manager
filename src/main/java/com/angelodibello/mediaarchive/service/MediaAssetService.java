@@ -244,4 +244,22 @@ public class MediaAssetService {
 
         return updatedAsset;
     }
+
+    public Path getStoredFile(Long id) {
+
+        MediaAsset asset = repository.findById(id)
+                .orElseThrow(
+                        () -> new MediaAssetNotFoundException(id)
+                );
+
+        Path filePath = Path.of(asset.getStoragePath());
+
+        if (!java.nio.file.Files.exists(filePath)) {
+            throw new IllegalStateException(
+                    "The stored media file is missing."
+            );
+        }
+
+        return filePath;
+    }
 }
