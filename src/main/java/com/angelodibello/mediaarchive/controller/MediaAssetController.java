@@ -7,11 +7,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.domain.Page;
+import org.springframework.util.StringUtils;
+import com.angelodibello.mediaarchive.dto.MediaAssetResponse;
 
 import java.io.IOException;
 import java.time.LocalDate;
 
 import java.util.List;
+import com.angelodibello.mediaarchive.dto.UpdateMediaAssetRequest;
 
 @RestController
 @RequestMapping("/api/media-assets")
@@ -51,52 +55,72 @@ public class MediaAssetController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable Long id
-    ) {
-        if (service.findById(id).isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
+    ) throws IOException {
 
         service.deleteById(id);
-        return ResponseEntity.noContent().build();
+
+        return ResponseEntity
+                .noContent()
+                .build();
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<?> upload(
+    public ResponseEntity<MediaAssetResponse> upload(
+
             @RequestParam("file") MultipartFile file,
+
             @RequestParam("title") String title,
+
             @RequestParam(required = false) String team,
+
             @RequestParam(required = false) String player,
+
             @RequestParam(required = false) String stadium,
+
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate gameDate,
+
             @RequestParam(required = false) String codec
-    ) {
-        try {
-            MediaAsset savedAsset = service.upload(
-                    file,
-                    title,
-                    team,
-                    player,
-                    stadium,
-                    gameDate,
-                    codec
+
+    ) throws IOException {
+
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "A video file is required."
             );
-
-            return ResponseEntity
-                    .status(HttpStatus.CREATED)
-                    .body(savedAsset);
-
-        } catch (IllegalStateException exception) {
-            return ResponseEntity
-                    .status(HttpStatus.CONFLICT)
-                    .body(exception.getMessage());
-
-        } catch (IOException exception) {
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("The video could not be stored.");
         }
+
+        if (!StringUtils.hasText(title)) {
+            throw new IllegalArgumentException(
+                    "Title is required."
+            );
+        }
+
+        String originalFilename = file.getOriginalFilename();
+
+        if (originalFilename == null ||
+                !originalFilename.toLowerCase().endsWith(".mp4")) {
+
+            throw new IllegalArgumentException(
+                    "Only MP4 files are supported."
+            );
+        }
+
+        MediaAsset savedAsset = service.upload(
+                file,
+                title.trim(),
+                team,
+                player,
+                stadium,
+                gameDate,
+                codec
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(MediaAssetResponse.fromEntity(savedAsset));
+
     }
 
     @GetMapping("/search/team")
@@ -125,5 +149,32 @@ public class MediaAssetController {
             @RequestParam String stadium
     ) {
         return service.searchByStadium(stadium);
+    }
+    @GetMapping("/page")
+    public Page<MediaAsset> findAllPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "uploadedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction
+    ) {
+        return service.findAllPaged(
+                page,
+                size,
+                sortBy,
+                direction
+        );
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<MediaAssetResponse> updateMetadata(
+            @PathVariable Long id,
+            @RequestBody UpdateMediaAssetRequest request
+    ) {
+        MediaAsset updatedAsset =
+                service.updateMetadata(id, request);
+
+        return ResponseEntity.ok(
+                MediaAssetResponse.fromEntity(updatedAsset)
+        );
     }
 }
